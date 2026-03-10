@@ -1,9 +1,11 @@
 import { COLORS, DARK_COLORS } from '@/constants';
 import { OnboardingScreen } from '@/screens';
 import { useProfileStore } from '@/stores';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFonts } from 'expo-font';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { useColorScheme } from 'react-native';
+import { ActivityIndicator, useColorScheme, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Icon, MD3DarkTheme, MD3LightTheme, PaperProvider } from 'react-native-paper';
 
@@ -30,6 +32,20 @@ const darkTheme = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const { isOnboarded } = useProfileStore();
+  const [fontsLoaded, fontError] = useFonts(MaterialCommunityIcons.font);
+
+  if (!fontsLoaded && !fontError) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator
+            size="small"
+            color={colorScheme === 'dark' ? DARK_COLORS.ui.primary : COLORS.ui.primary}
+          />
+        </View>
+      </GestureHandlerRootView>
+    );
+  }
 
   if (!isOnboarded) {
     return (

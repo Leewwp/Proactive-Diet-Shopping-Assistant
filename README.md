@@ -101,6 +101,80 @@ npm run lint
 - 阿里云兜底依赖外部服务可用性与套餐配额
 - 离线模式下无法进行远程商品识别（仅可查看本地已缓存记录）
 
+## 团队协作与部署指南
+
+### 预览地址
+
+- **Web 预览**: https://proactive-diet-shopping-assistant--dgv9cuug7w.expo.app
+- **Android APK**: 正在构建中，构建完成后可在 Expo 控制台下载
+
+### 参与开发
+
+#### 1) 克隆项目
+
+```bash
+git clone <your-repo-url>
+cd Proactive-Diet-Shopping-Assistant
+npm install
+```
+
+#### 2) 登录 Expo 账号
+
+```bash
+npx expo login
+# 输入你的 Expo 账号邮箱和密码
+# 如果开启了 2FA，使用 --otp 参数
+```
+
+#### 3) 本地开发
+
+```bash
+npx expo start
+# 或启动特定平台
+npm run web      # Web 开发服务器
+npm run android  # Android
+npm run ios      # iOS
+```
+
+### 部署更新
+
+代码提交后，需要重新构建才能在预览地址看到效果。
+
+#### 部署 Web
+
+```bash
+# 1. 导出 Web 资源
+npx expo export -p web
+
+# 2. 部署到 EAS Hosting
+npx eas deploy
+```
+
+部署完成后访问: https://proactive-diet-shopping-assistant--dgv9cuug7w.expo.app
+
+#### 部署 Android (APK)
+
+```bash
+# 预览版本（生成 APK）
+npx eas build -p android --profile preview
+```
+
+构建完成后在 Expo 控制台下载 APK:
+https://expo.dev/accounts/polyu-hci-group/projects/proactive-diet-shopping-assistant/builds
+
+### 常见问题
+
+**Q: 推送代码后网页没有更新？**
+A: Web 需要手动执行 `npx expo export -p web && npx eas deploy` 重新部署。
+
+**Q: Android 构建排队时间很长？**
+A: 免费账户有排队限制，可考虑订阅 Expo 付费计划加速。
+
+**Q: 遇到 EAS 登录问题？**
+A: 确保你的 Expo 账号已添加到 `polyu-hci-group` 组织。
+
+---
+
 ## 许可证
 
 `private` 项目，默认不对外发布。

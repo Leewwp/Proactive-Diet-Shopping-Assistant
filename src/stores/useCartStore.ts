@@ -1,9 +1,10 @@
 import { AlertInfo, CartItem, CartNutritionSummary, Product } from '@/types';
 import { calculateOverallComplianceScore, determineAlertLevel } from '@/utils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
 import { useProfileStore } from './useProfileStore';
+
+const { create } = require('zustand');
+const { createJSONStorage, persist } = require('zustand/middleware');
 
 interface CartState {
   items: CartItem[];

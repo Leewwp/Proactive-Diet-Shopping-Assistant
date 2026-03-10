@@ -7,22 +7,23 @@
     "icon": "./assets/images/icon.png",
     "scheme": "proactivedietshoppingassistant",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "ios": {
-      "icon": "./assets/expo.icon",
+      "supportsTablet": true,
+      "bundleIdentifier": "com.polyu.proactivedietshoppingassistant",
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs camera access to scan product barcodes."
       }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#1976D2",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#1976D2"
       },
+      "package": "com.polyu.proactivedietshoppingassistant",
       "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.CAMERA"
       ]
     },
     "web": {
@@ -31,16 +32,6 @@
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "backgroundColor": "#1976D2",
-          "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
-          }
-        }
-      ],
       [
         "expo-camera",
         {
@@ -52,7 +43,9 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {},
+      "router": {
+        "origin": false
+      },
       "eas": {
         "projectId": "ffa31901-dd7e-4675-9c03-f726639ec47e"
       }

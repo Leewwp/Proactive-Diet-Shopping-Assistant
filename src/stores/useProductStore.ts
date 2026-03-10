@@ -1,7 +1,8 @@
 import { Product, ScannedProduct } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+
+const { create } = require('zustand');
+const { createJSONStorage, persist } = require('zustand/middleware');
 
 interface ProductState {
   recentScans: ScannedProduct[];

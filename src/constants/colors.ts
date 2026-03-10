@@ -1,0 +1,141 @@
+export const COLORS = {
+  compliance: {
+    emergency: '#B42318',
+    suggestion: '#B54708',
+    optimization: '#0B63CE',
+    compliant: '#0F7B38',
+  },
+  comparison: {
+    worse: '#B42318',
+    neutral: '#B54708',
+    better: '#0F7B38',
+  },
+  meter: {
+    low: '#0F7B38',
+    mid: '#B54708',
+    high: '#B42318',
+  },
+  ui: {
+    primary: '#0B63CE',
+    primaryDark: '#084A9B',
+    primaryLight: '#5A96E6',
+    primaryContainer: '#E8F1FD',
+    onPrimaryContainer: '#052F67',
+    secondary: '#0F7B38',
+    secondaryContainer: '#DCF7E6',
+    onSecondaryContainer: '#063C1A',
+    surface: '#FFFFFF',
+    surfaceVariant: '#F2F6FC',
+    background: '#F7FAFF',
+    error: '#B42318',
+    errorContainer: '#FDEDEC',
+    success: '#0F7B38',
+    successContainer: '#E9F8EE',
+    warning: '#B54708',
+    warningContainer: '#FFF0E5',
+    text: '#0F172A',
+    textSecondary: '#475467',
+    textTertiary: '#667085',
+    border: '#D6DFEE',
+    outline: '#667085',
+    outlineVariant: '#B7C3DA',
+  },
+  nutriScore: {
+    A: '#0F7B38',
+    B: '#33A357',
+    C: '#D18A00',
+    D: '#D66C18',
+    E: '#B42318',
+  },
+};
+
+export const DARK_COLORS = {
+  compliance: {
+    emergency: '#F97066',
+    suggestion: '#FEC84B',
+    optimization: '#7CB3F5',
+    compliant: '#85D1A1',
+  },
+  comparison: {
+    worse: '#F97066',
+    neutral: '#FEC84B',
+    better: '#85D1A1',
+  },
+  meter: {
+    low: '#85D1A1',
+    mid: '#FEC84B',
+    high: '#F97066',
+  },
+  ui: {
+    primary: '#7CB3F5',
+    primaryDark: '#0B63CE',
+    primaryLight: '#A6CBFB',
+    primaryContainer: '#143F7B',
+    onPrimaryContainer: '#E6F0FF',
+    secondary: '#85D1A1',
+    secondaryContainer: '#1F5131',
+    onSecondaryContainer: '#DFF8E8',
+    surface: '#111B2D',
+    surfaceVariant: '#18243A',
+    background: '#0B1320',
+    error: '#F97066',
+    errorContainer: '#66211E',
+    success: '#85D1A1',
+    successContainer: '#1F5131',
+    warning: '#FEC84B',
+    warningContainer: '#644A13',
+    text: '#F8FAFC',
+    textSecondary: '#CBD5E1',
+    textTertiary: '#E2E8F0',
+    border: '#23344F',
+    outline: '#CBD5E1',
+    outlineVariant: '#3A4F72',
+  },
+  nutriScore: {
+    A: '#0F7B38',
+    B: '#33A357',
+    C: '#D18A00',
+    D: '#D66C18',
+    E: '#B42318',
+  },
+};
+
+export const SPACING = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+};
+
+export const BORDER_RADIUS = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  full: 9999,
+};
+
+export const TYPOGRAPHY = {
+  fontFamily: {
+    regular: 'System',
+    medium: 'System',
+    bold: 'System',
+  },
+  fontSize: {
+    xs: 10,
+    sm: 12,
+    md: 14,
+    lg: 16,
+    xl: 18,
+    xxl: 22,
+    xxxl: 28,
+  },
+  lineHeight: {
+    tight: 1.2,
+    normal: 1.5,
+    relaxed: 1.75,
+  },
+};

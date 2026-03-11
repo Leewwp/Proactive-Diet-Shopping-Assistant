@@ -170,7 +170,7 @@ npm run lint
 
 ### 预览地址
 
-- **Web 预览**: <https://proactive-diet-shopping-assistant--dgv9cuug7w.expo.app>
+- **Web 预览**: <https://proactive-diet-shopping-assistant--guzccluucx.expo.app>
 - **Android APK**: Expo构建失败，待处理
 
 ### 参与开发
@@ -215,7 +215,7 @@ npx expo export -p web
 npx eas deploy
 ```
 
-部署完成后访问: <https://proactive-diet-shopping-assistant--dgv9cuug7w.expo.app>
+部署完成后访问Deployment URL: <https://proactive-diet-shopping-assistant--guzccluucx.expo.app>
 
 #### 部署 Android (APK)
 

@@ -1,18 +1,9 @@
 import { COLORS, DARK_COLORS } from '@/constants';
-import { Product } from '@/types';
+import { ComparisonMetric, Product } from '@/types';
 import { getComparisonColor } from '@/utils';
 import React from 'react';
 import { StyleSheet, useColorScheme, View } from 'react-native';
 import { Card, Divider, Icon, Text } from 'react-native-paper';
-
-interface ComparisonMetric {
-  name: string;
-  valueA: number;
-  valueB: number;
-  unit: string;
-  statusA: 'better' | 'worse' | 'neutral';
-  statusB: 'better' | 'worse' | 'neutral';
-}
 
 interface ProductComparisonProps {
   productA: Product;

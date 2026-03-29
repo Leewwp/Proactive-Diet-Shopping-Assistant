@@ -1,3 +1,4 @@
+import { LocalProduct } from '@/types/localProduct';
 import { Product } from '@/types';
 
 export interface AIConfig {
@@ -218,6 +219,45 @@ export function getAIProviderName(): string {
   const config = getAIConfig();
   if (!config?.apiKey) return 'Not configured';
   return config.provider || 'OpenAI';
+}
+
+let demoProductIndex = 0;
+
+export async function getDemoProduct(localProducts: LocalProduct[]): Promise<Product | null> {
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  if (localProducts.length === 0) return null;
+  
+  const sortedProducts = [...localProducts].sort((a, b) => 
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  
+  const topTwoProducts = sortedProducts.slice(0, 2);
+  
+  const product = topTwoProducts[demoProductIndex % topTwoProducts.length];
+  demoProductIndex++;
+  
+  return convertLocalProductToProduct(product);
+}
+
+export function resetDemoIndex(): void {
+  demoProductIndex = 0;
+}
+
+function convertLocalProductToProduct(localProduct: LocalProduct): Product {
+  return {
+    barcode: localProduct.barcode,
+    name: localProduct.name,
+    brand: localProduct.brand,
+    imageUrl: localProduct.imageUrl,
+    nutrition: localProduct.nutrition,
+    allergens: localProduct.allergens,
+    categories: localProduct.categories,
+    nutriScore: localProduct.nutriScore,
+    ingredients: localProduct.ingredients,
+    servingSize: localProduct.servingSize,
+    quantity: localProduct.quantity,
+  };
 }
 
 export { getAIConfig };

@@ -1,11 +1,13 @@
 import { checkAllergenMatch } from '@/constants';
 import {
-  AlertInfo,
-  AllergenCategory,
-  FamilyMember,
-  NutritionThreshold,
-  Product,
-  UserProfile,
+    AlertInfo,
+    AllergenCategory,
+    CartItem,
+    FamilyMember,
+    NutritionInfo,
+    NutritionThreshold,
+    Product,
+    UserProfile,
 } from '@/types';
 import { getCombinedThresholds } from './nutritionThresholds';
 
@@ -206,4 +208,51 @@ export function calculateOverallComplianceScore(products: Product[], profile: Us
   });
 
   return Math.round(totalScore / products.length);
+}
+
+export function calculateCartNutrition(items: CartItem[]): NutritionInfo {
+  const totals: NutritionInfo = {
+    calories: 0,
+    sugar: 0,
+    fat: 0,
+    saturatedFat: 0,
+    sodium: 0,
+    protein: 0,
+    fiber: 0,
+    carbohydrates: 0,
+  };
+
+  items.forEach((item) => {
+    const { nutrition } = item.product;
+    const qty = item.quantity;
+    totals.calories += nutrition.calories * qty;
+    totals.sugar += nutrition.sugar * qty;
+    totals.fat += nutrition.fat * qty;
+    totals.saturatedFat += nutrition.saturatedFat * qty;
+    totals.sodium += nutrition.sodium * qty;
+    totals.protein += nutrition.protein * qty;
+    totals.fiber += nutrition.fiber * qty;
+    totals.carbohydrates += nutrition.carbohydrates * qty;
+  });
+
+  return totals;
+}
+
+export function checkCartConflicts(
+  items: CartItem[],
+  profile: UserProfile
+): { message: string; product: Product }[] {
+  const conflicts: { message: string; product: Product }[] = [];
+
+  items.forEach((item) => {
+    const alert = determineAlertLevel(item.product, profile);
+    if (alert.level === 'emergency') {
+      conflicts.push({
+        message: `${item.product.name}: ${alert.message}`,
+        product: item.product,
+      });
+    }
+  });
+
+  return conflicts;
 }

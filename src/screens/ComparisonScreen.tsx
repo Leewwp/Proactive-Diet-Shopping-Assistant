@@ -6,7 +6,7 @@ import {
     useColorScheme,
     View,
 } from 'react-native';
-import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Card, IconButton, Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProductComparison } from '@/components';
@@ -26,7 +26,7 @@ export function ComparisonScreen() {
   const { barcode } = useLocalSearchParams<{ barcode?: string }>();
 
   const { profile } = useProfileStore();
-  const { comparisonProducts, getCachedProduct, cacheProduct } = useProductStore();
+  const { comparisonProducts, getCachedProduct, cacheProduct, addToComparison, clearComparison, removeFromComparison } = useProductStore();
   const { addItem } = useCartStore();
 
   const [productA, setProductA] = useState<Product | null>(null);
@@ -69,54 +69,60 @@ export function ComparisonScreen() {
         valueA: productA.nutrition.calories,
         valueB: productB.nutrition.calories,
         unit: 'kcal',
-        statusA: 'neutral',
-        statusB: 'neutral',
+        statusA: 'neutral' as const,
+        statusB: 'neutral' as const,
       },
       {
         name: 'Sugar',
         valueA: productA.nutrition.sugar,
         valueB: productB.nutrition.sugar,
         unit: 'g',
-        statusA: 'neutral',
-        statusB: 'neutral',
+        statusA: 'neutral' as const,
+        statusB: 'neutral' as const,
       },
       {
         name: 'Fat',
         valueA: productA.nutrition.fat,
         valueB: productB.nutrition.fat,
         unit: 'g',
-        statusA: 'neutral',
-        statusB: 'neutral',
+        statusA: 'neutral' as const,
+        statusB: 'neutral' as const,
       },
       {
         name: 'Sodium',
         valueA: productA.nutrition.sodium * 1000,
         valueB: productB.nutrition.sodium * 1000,
         unit: 'mg',
-        statusA: 'neutral',
-        statusB: 'neutral',
+        statusA: 'neutral' as const,
+        statusB: 'neutral' as const,
       },
       {
         name: 'Protein',
         valueA: productA.nutrition.protein,
         valueB: productB.nutrition.protein,
         unit: 'g',
-        statusA: 'neutral',
-        statusB: 'neutral',
+        statusA: 'neutral' as const,
+        statusB: 'neutral' as const,
       },
     ];
 
-    metrics.forEach((metric) => {
+    return metrics.map((metric) => {
+      const isProtein = metric.name === 'Protein';
       if (metric.valueA < metric.valueB) {
-        metric.statusA = metric.name === 'Protein' ? 'worse' : 'better';
-        metric.statusB = metric.name === 'Protein' ? 'better' : 'worse';
+        return {
+          ...metric,
+          statusA: isProtein ? 'worse' : 'better',
+          statusB: isProtein ? 'better' : 'worse',
+        };
       } else if (metric.valueA > metric.valueB) {
-        metric.statusA = metric.name === 'Protein' ? 'better' : 'worse';
-        metric.statusB = metric.name === 'Protein' ? 'worse' : 'better';
+        return {
+          ...metric,
+          statusA: isProtein ? 'better' : 'worse',
+          statusB: isProtein ? 'worse' : 'better',
+        };
       }
+      return metric;
     });
-
-    return metrics;
   };
 
   const getWinner = (): 'A' | 'B' | 'tie' => {
@@ -130,17 +136,33 @@ export function ComparisonScreen() {
     const selectedProduct = product === 'A' ? productA : productB;
     if (selectedProduct) {
       addItem(selectedProduct);
+      clearComparison();
       router.back();
     }
   };
 
-  const handleScanAnother = () => {
-    router.push('/scan');
+  const handleScanProduct = (slot: 'A' | 'B') => {
+    router.push(`/scan?compare=true&slot=${slot}` as any);
+  };
+
+  const handleReplaceProduct = (slot: 'A' | 'B') => {
+    if (slot === 'A' && productA) {
+      removeFromComparison(productA.barcode);
+    } else if (slot === 'B' && productB) {
+      removeFromComparison(productB.barcode);
+    }
+    router.push(`/scan?compare=true&slot=${slot}` as any);
+  };
+
+  const handleStartNew = () => {
+    clearComparison();
+    setProductA(null);
+    setProductB(null);
   };
 
   if (isLoading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: isDark ? colors.ui.background : colors.ui.background }]}>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.ui.background }]}>
         <ActivityIndicator size="large" color={colors.ui.primary} />
       </View>
     );
@@ -148,43 +170,78 @@ export function ComparisonScreen() {
 
   if (!productA || !productB) {
     return (
-      <View style={[styles.emptyContainer, { backgroundColor: isDark ? colors.ui.background : colors.ui.background }]}>
-        <Text variant="headlineMedium" style={styles.emptyTitle}>
-          Compare Products
-        </Text>
-        <Text variant="bodyMedium" style={{ color: colors.ui.textSecondary, textAlign: 'center' }}>
+      <View style={[styles.emptyContainer, { backgroundColor: colors.ui.background }]}>
+        <View style={styles.emptyHeader}>
+          <Text variant="headlineMedium" style={styles.emptyTitle}>
+            Compare Products
+          </Text>
+          <Button mode="text" onPress={handleStartNew} icon="refresh">
+            New
+          </Button>
+        </View>
+        <Text variant="bodyMedium" style={{ color: colors.ui.textSecondary, textAlign: 'center', marginBottom: 24 }}>
           Scan two products to compare them side by side
         </Text>
 
         <View style={styles.productSlots}>
           <Card
-            style={[styles.productSlot, { backgroundColor: isDark ? colors.ui.surface : colors.ui.surface }]}
-            onPress={handleScanAnother}
+            style={[styles.productSlot, { backgroundColor: colors.ui.surface }]}
+            onPress={() => handleScanProduct('A')}
           >
             <Card.Content style={styles.slotContent}>
-              <Text variant="titleMedium">
-                {productA ? productA.name : 'Product A'}
-              </Text>
-              {!productA && (
-                <Button mode="contained" onPress={handleScanAnother} style={{ marginTop: 12 }}>
-                  Scan
-                </Button>
+              {productA ? (
+                <>
+                  <Text variant="titleSmall" numberOfLines={2} style={{ textAlign: 'center' }}>
+                    {productA.name}
+                  </Text>
+                  <Button 
+                    mode="text" 
+                    onPress={() => handleReplaceProduct('A')}
+                    style={{ marginTop: 8 }}
+                    compact
+                    icon="swap-horizontal"
+                  >
+                    Replace
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Text variant="titleMedium">Product A</Text>
+                  <Button mode="contained" onPress={() => handleScanProduct('A')} style={{ marginTop: 12 }}>
+                    Scan
+                  </Button>
+                </>
               )}
             </Card.Content>
           </Card>
 
           <Card
-            style={[styles.productSlot, { backgroundColor: isDark ? colors.ui.surface : colors.ui.surface }]}
-            onPress={handleScanAnother}
+            style={[styles.productSlot, { backgroundColor: colors.ui.surface }]}
+            onPress={() => handleScanProduct('B')}
           >
             <Card.Content style={styles.slotContent}>
-              <Text variant="titleMedium">
-                {productB ? productB.name : 'Product B'}
-              </Text>
-              {!productB && (
-                <Button mode="contained" onPress={handleScanAnother} style={{ marginTop: 12 }}>
-                  Scan
-                </Button>
+              {productB ? (
+                <>
+                  <Text variant="titleSmall" numberOfLines={2} style={{ textAlign: 'center' }}>
+                    {productB.name}
+                  </Text>
+                  <Button 
+                    mode="text" 
+                    onPress={() => handleReplaceProduct('B')}
+                    style={{ marginTop: 8 }}
+                    compact
+                    icon="swap-horizontal"
+                  >
+                    Replace
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Text variant="titleMedium">Product B</Text>
+                  <Button mode="contained" onPress={() => handleScanProduct('B')} style={{ marginTop: 12 }}>
+                    Scan
+                  </Button>
+                </>
               )}
             </Card.Content>
           </Card>
@@ -197,10 +254,44 @@ export function ComparisonScreen() {
   const winner = getWinner();
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? colors.ui.background : colors.ui.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.ui.background }]}>
       <ScrollView
         contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: insets.bottom + 100 }}
       >
+        <View style={styles.comparisonHeader}>
+          <Text variant="titleMedium">Product Comparison</Text>
+          <Button mode="text" onPress={handleStartNew} icon="refresh" compact>
+            New
+          </Button>
+        </View>
+
+        <View style={styles.productReplaceRow}>
+          <View style={styles.productReplaceItem}>
+            <Text variant="labelSmall" style={{ color: colors.ui.textSecondary }}>Product A</Text>
+            <Text variant="titleSmall" numberOfLines={1} style={{ flex: 1 }}>
+              {productA.name}
+            </Text>
+            <IconButton
+              icon="swap-horizontal"
+              size={18}
+              mode="outlined"
+              onPress={() => handleReplaceProduct('A')}
+            />
+          </View>
+          <View style={styles.productReplaceItem}>
+            <Text variant="labelSmall" style={{ color: colors.ui.textSecondary }}>Product B</Text>
+            <Text variant="titleSmall" numberOfLines={1} style={{ flex: 1 }}>
+              {productB.name}
+            </Text>
+            <IconButton
+              icon="swap-horizontal"
+              size={18}
+              mode="outlined"
+              onPress={() => handleReplaceProduct('B')}
+            />
+          </View>
+        </View>
+
         <ProductComparison
           productA={productA}
           productB={productB}
@@ -254,13 +345,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
   },
-  emptyTitle: {
+  emptyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
+  },
+  emptyTitle: {
+    marginRight: 12,
   },
   productSlots: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 24,
     width: '100%',
   },
   productSlot: {
@@ -270,6 +365,29 @@ const styles = StyleSheet.create({
   slotContent: {
     alignItems: 'center',
     paddingVertical: 24,
+  },
+  comparisonHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  productReplaceRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    gap: 12,
+  },
+  productReplaceItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(150, 150, 150, 0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
   },
   footer: {
     position: 'absolute',

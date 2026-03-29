@@ -1,34 +1,37 @@
-import { BarcodeScanner, ObjectDetector, ProductCard } from '@/components';
+import { AlertCard, BarcodeScanner, ObjectDetector, ProductCard } from '@/components';
 import { COLORS, DARK_COLORS } from '@/constants';
 import {
-  fetchProductByBarcode,
-  getBarcodeType,
-  isBarcodeValid,
-  normalizeBarcode,
-  searchProducts,
+    convertLocalProductToProduct,
+    fetchProductByBarcode,
+    getBarcodeType,
+    isBarcodeValid,
+    normalizeBarcode,
+    searchProducts,
 } from '@/services';
-import { useProductStore, useProfileStore } from '@/stores';
-import { Product } from '@/types';
+import { useCartStore, useLocalProductStore, useProductStore, useProfileStore } from '@/stores';
+import { AlertInfo, Product } from '@/types';
 import { determineAlertLevel } from '@/utils';
-import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  useColorScheme,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    useColorScheme,
+    View
 } from 'react-native';
 import {
-  ActivityIndicator,
-  Button,
-  Card,
-  IconButton,
-  SegmentedButtons,
-  Text,
-  TextInput,
+    ActivityIndicator,
+    Button,
+    Card,
+    IconButton,
+    Portal,
+    SegmentedButtons,
+    Text,
+    TextInput,
 } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -40,9 +43,15 @@ export function ScanScreen() {
   const colors = isDark ? DARK_COLORS : COLORS;
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams<{ compare?: string; slot?: string }>();
+
+  const isCompareMode = params.compare === 'true';
+  const compareSlot = params.slot || 'A';
 
   const { profile } = useProfileStore();
-  const { addRecentScan, getCachedProduct, recentScans, isLoading, setLoading } = useProductStore();
+  const { addRecentScan, getCachedProduct, recentScans, isLoading, setLoading, addToComparison, comparisonProducts } = useProductStore();
+  const { getProductByBarcode, searchProducts: searchLocalProducts } = useLocalProductStore();
+  const { addItem } = useCartStore();
 
   const [scanMode, setScanMode] = useState<ScanMode>('barcode');
   const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
@@ -53,6 +62,8 @@ export function ScanScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [alertInfo, setAlertInfo] = useState<AlertInfo | null>(null);
 
   useEffect(() => {
     setLoading(false);
@@ -61,9 +72,31 @@ export function ScanScreen() {
     };
   }, [setLoading]);
 
+  const handleProductFound = useCallback((product: Product) => {
+    addRecentScan(product);
+    
+    if (isCompareMode) {
+      addToComparison(product);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+      router.replace('/compare');
+      return;
+    }
+    
+    setScannedProduct(product);
+  }, [addRecentScan, addToComparison, isCompareMode, router]);
+
   const handleBarcodeScan = useCallback(
     async (rawBarcode: string) => {
-      const barcode = normalizeBarcode(rawBarcode);
+      const cleanRawBarcode = rawBarcode.trim();
+      
+      const localProductRaw = getProductByBarcode(cleanRawBarcode);
+      if (localProductRaw) {
+        const product = convertLocalProductToProduct(localProductRaw);
+        handleProductFound(product);
+        return;
+      }
+
+      const barcode = normalizeBarcode(cleanRawBarcode);
       if (!isBarcodeValid(barcode)) {
         setLocalError('Invalid barcode format. Please scan an EAN/UPC product code.');
         return;
@@ -75,20 +108,25 @@ export function ScanScreen() {
       const barcodeType = getBarcodeType(barcode);
 
       try {
+        const localProduct = getProductByBarcode(barcode);
+        if (localProduct) {
+          const product = convertLocalProductToProduct(localProduct);
+          handleProductFound(product);
+          return;
+        }
+
         const cachedProduct = getCachedProduct(barcode);
         if (cachedProduct) {
-          addRecentScan(cachedProduct);
-          setScannedProduct(cachedProduct);
+          handleProductFound(cachedProduct);
           return;
         }
 
         const product = await fetchProductByBarcode(barcode);
         if (product) {
-          addRecentScan(product);
-          setScannedProduct(product);
+          handleProductFound(product);
         } else {
           setLocalError(
-            `Product not found in current databases.\n\nBarcode: ${barcode}\nRegion: ${barcodeType}\n\nTry:\n- Search by product name\n- Enter barcode manually`
+            `Product not found in current databases.\n\nBarcode: ${barcode}\nRegion: ${barcodeType}\n\nTry:\n- Search by product name\n- Enter barcode manually\n- Add to local products`
           );
         }
       } catch {
@@ -97,7 +135,7 @@ export function ScanScreen() {
         setLoading(false);
       }
     },
-    [addRecentScan, getCachedProduct, setLoading]
+    [getCachedProduct, getProductByBarcode, handleProductFound, setLoading]
   );
 
   const handleManualSearch = useCallback(async () => {
@@ -119,10 +157,22 @@ export function ScanScreen() {
     setLocalError(null);
 
     try {
-      const results = await searchProducts(searchQuery.trim());
-      setSearchResults(results);
+      const localResults = searchLocalProducts(searchQuery.trim());
+      const localProducts = localResults.map(convertLocalProductToProduct);
+      
+      const remoteResults = await searchProducts(searchQuery.trim());
+      
+      const allResults = [...localProducts];
+      const localBarcodes = new Set(localProducts.map((p: Product) => p.barcode));
+      for (const product of remoteResults) {
+        if (!localBarcodes.has(product.barcode)) {
+          allResults.push(product);
+        }
+      }
+      
+      setSearchResults(allResults);
 
-      if (results.length === 0) {
+      if (allResults.length === 0) {
         setLocalError('No products found. Try a different search term.');
       }
     } catch {
@@ -130,14 +180,13 @@ export function ScanScreen() {
     } finally {
       setIsSearching(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, searchLocalProducts]);
 
   const handleObjectDetect = useCallback(
     (product: Product) => {
-      addRecentScan(product);
-      setScannedProduct(product);
+      handleProductFound(product);
     },
-    [addRecentScan]
+    [handleProductFound]
   );
 
   const handleProductPress = useCallback(() => {
@@ -147,19 +196,38 @@ export function ScanScreen() {
   }, [router, scannedProduct]);
 
   const handleAddToCart = useCallback(() => {
-    if (scannedProduct) {
-      router.push({
-        pathname: '/product/[barcode]' as const,
-        params: { barcode: scannedProduct.barcode, addToCart: 'true' },
-      });
+    if (!scannedProduct || !profile) {
+      return;
     }
-  }, [router, scannedProduct]);
+
+    const alert = determineAlertLevel(scannedProduct, profile);
+    setAlertInfo(alert);
+
+    if (alert.level !== 'compliant') {
+      setShowConfirmDialog(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
+    } else {
+      performAddToCart();
+    }
+  }, [profile, scannedProduct]);
+
+  const performAddToCart = useCallback(() => {
+    if (!scannedProduct) return;
+    
+    addItem(scannedProduct);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    setShowConfirmDialog(false);
+    setScannedProduct(null);
+    setAlertInfo(null);
+  }, [addItem, scannedProduct]);
 
   const handleDismiss = useCallback(() => {
     setScannedProduct(null);
     setLocalError(null);
     setSearchResults([]);
     setSearchQuery('');
+    setAlertInfo(null);
+    setShowConfirmDialog(false);
   }, []);
 
   const closeErrorDialog = useCallback(() => {
@@ -168,18 +236,37 @@ export function ScanScreen() {
 
   const handleSelectSearchResult = useCallback(
     (product: Product) => {
-      addRecentScan(product);
-      setScannedProduct(product);
+      handleProductFound(product);
       setSearchResults([]);
       setSearchQuery('');
       setShowSearch(false);
     },
-    [addRecentScan]
+    [handleProductFound]
   );
+
+  const handleGoToLocalProducts = useCallback(() => {
+    router.push('/local-products' as any);
+  }, [router]);
+
+  const handleRecentProductPress = useCallback((product: Product) => {
+    if (isCompareMode) {
+      addToComparison(product);
+      router.back();
+    } else {
+      router.push(`/product/${product.barcode}` as const);
+    }
+  }, [isCompareMode, addToComparison, router]);
 
   const alertLevel =
     scannedProduct && profile ? determineAlertLevel(scannedProduct, profile).level : 'compliant';
   const isErrorDialogVisible = Boolean(error) && searchResults.length === 0;
+
+  const getTitle = () => {
+    if (isCompareMode) {
+      return `Scan Product ${compareSlot}`;
+    }
+    return 'Scan Product';
+  };
 
   return (
     <KeyboardAvoidingView
@@ -191,12 +278,25 @@ export function ScanScreen() {
           <Card.Content>
             <View style={styles.headerRow}>
               <View style={styles.titleBlock}>
-                <Text variant="headlineSmall">Scan Product</Text>
-                <Text variant="bodySmall" style={{ color: colors.ui.textSecondary }}>
-                  Faster lookup with region-aware barcode matching
-                </Text>
+                <Text variant="headlineSmall">{getTitle()}</Text>
+                {isCompareMode && (
+                  <Text variant="bodySmall" style={{ color: colors.ui.primary }}>
+                    Select a product to compare
+                  </Text>
+                )}
+                {!isCompareMode && (
+                  <Text variant="bodySmall" style={{ color: colors.ui.textSecondary }}>
+                    Faster lookup with region-aware barcode matching
+                  </Text>
+                )}
               </View>
               <View style={styles.headerActions}>
+                <IconButton
+                  icon="database"
+                  mode="outlined"
+                  size={20}
+                  onPress={handleGoToLocalProducts}
+                />
                 <IconButton
                   icon="keyboard"
                   mode="outlined"
@@ -294,7 +394,7 @@ export function ScanScreen() {
             isActive={!scannedProduct && !showManualInput && !showSearch && !isErrorDialogVisible}
           />
         ) : (
-          <ObjectDetector onDetect={handleObjectDetect} isActive={!scannedProduct && !isErrorDialogVisible} />
+          <ObjectDetector onDetect={handleObjectDetect} isActive={isCompareMode || (!scannedProduct && !isErrorDialogVisible)} />
         )}
       </View>
 
@@ -343,7 +443,18 @@ export function ScanScreen() {
                   Search Name
                 </Button>
               </View>
-              <Button mode="contained" onPress={handleDismiss} style={{ marginTop: 12 }}>
+              <Button
+                mode="contained"
+                onPress={() => {
+                  closeErrorDialog();
+                  handleGoToLocalProducts();
+                }}
+                icon="database"
+                style={{ marginTop: 12 }}
+              >
+                Add to Local Products
+              </Button>
+              <Button mode="outlined" onPress={handleDismiss} style={{ marginTop: 8 }}>
                 Try Again
               </Button>
             </Card.Content>
@@ -382,7 +493,7 @@ export function ScanScreen() {
         </View>
       )}
 
-      {scannedProduct && !isLoading && (
+      {scannedProduct && !isLoading && !isCompareMode && (
         <View
           style={[
             styles.productSheet,
@@ -395,6 +506,16 @@ export function ScanScreen() {
         >
           <View style={[styles.handle, { backgroundColor: colors.ui.outlineVariant }]} />
           <ProductCard product={scannedProduct} alertLevel={alertLevel} onPress={handleProductPress} />
+          {alertInfo && alertInfo.level !== 'compliant' && (
+            <View style={styles.alertContainer}>
+              <AlertCard
+                level={alertInfo.level}
+                title={alertInfo.level === 'emergency' ? 'Warning' : alertInfo.level === 'suggestion' ? 'Caution' : 'Tip'}
+                message={alertInfo.message}
+                visible={true}
+              />
+            </View>
+          )}
           <View style={styles.productActions}>
             <Button mode="outlined" onPress={handleDismiss} style={styles.actionButton}>
               Scan Another
@@ -406,32 +527,52 @@ export function ScanScreen() {
         </View>
       )}
 
-      {recentScans.length > 0 && !scannedProduct && !searchResults.length && (
-        <View
-          style={[
-            styles.recentScans,
-            {
-              backgroundColor: isDark ? 'rgba(18, 28, 45, 0.92)' : 'rgba(244, 248, 255, 0.96)',
-              paddingBottom: insets.bottom + 16,
-            },
-          ]}
-        >
-          <Text variant="labelMedium" style={[styles.recentTitle, { color: colors.ui.text }]}>
-            Recent Scans
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {recentScans.slice(0, 5).map((product) => (
-              <View key={product.barcode} style={styles.recentItem}>
-                <ProductCard
-                  product={product}
-                  compact
-                  onPress={() => router.push(`/product/${product.barcode}` as const)}
-                />
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+      <Portal>
+        {showConfirmDialog && alertInfo && (
+          <View style={styles.confirmDialogOverlay}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowConfirmDialog(false)} />
+            <Card style={[styles.confirmDialog, { backgroundColor: colors.ui.surface }]}>
+              <Card.Content>
+                <Text variant="titleMedium" style={{ marginBottom: 12 }}>
+                  {alertInfo.level === 'emergency' ? '⚠️ Allergen Warning' : 'Add to Cart?'}
+                </Text>
+                <Text variant="bodyMedium" style={{ marginBottom: 16 }}>
+                  {alertInfo.message}
+                </Text>
+                <Text variant="bodySmall" style={{ color: colors.ui.textSecondary, marginBottom: 16 }}>
+                  Product: {scannedProduct?.name}
+                </Text>
+                <View style={styles.confirmActions}>
+                  <Button
+                    mode="outlined"
+                    onPress={() => setShowConfirmDialog(false)}
+                    style={styles.confirmButton}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    mode="outlined"
+                    onPress={() => {
+                      setShowConfirmDialog(false);
+                      router.push(`/product/${scannedProduct?.barcode}` as const);
+                    }}
+                    style={styles.confirmButton}
+                  >
+                    View Details
+                  </Button>
+                </View>
+                <Button
+                  mode="contained"
+                  onPress={performAddToCart}
+                  style={{ marginTop: 8 }}
+                >
+                  Add Anyway
+                </Button>
+              </Card.Content>
+            </Card>
+          </View>
+        )}
+      </Portal>
     </KeyboardAvoidingView>
   );
 }
@@ -527,7 +668,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     borderTopWidth: 1,
     padding: 16,
-    maxHeight: '62%',
+    maxHeight: '72%',
+  },
+  alertContainer: {
+    marginTop: 12,
   },
   searchResultsSheet: {
     position: 'absolute',
@@ -558,20 +702,24 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 1,
   },
-  recentScans: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  confirmDialogOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(6, 16, 34, 0.6)',
+    zIndex: 100,
     padding: 16,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
   },
-  recentTitle: {
-    marginBottom: 12,
+  confirmDialog: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 16,
   },
-  recentItem: {
-    marginRight: 12,
-    width: 168,
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  confirmButton: {
+    flex: 1,
   },
 });

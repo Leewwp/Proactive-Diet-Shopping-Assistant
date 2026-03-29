@@ -123,6 +123,12 @@ export default function RootLayout() {
               href: null,
             }}
           />
+          <Tabs.Screen
+            name="local-products"
+            options={{
+              href: null,
+            }}
+          />
         </Tabs>
       </PaperProvider>
     </GestureHandlerRootView>

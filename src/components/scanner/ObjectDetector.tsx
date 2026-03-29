@@ -1,15 +1,16 @@
 import { COLORS, DARK_COLORS } from '@/constants';
-import {
-  convertAIResultToProduct,
-  getAIProviderName,
-  identifyProductFromImage,
-  isAIConfigured,
-} from '@/services/aiProductIdentifier';
+import { getDemoProduct, isAIConfigured } from '@/services/aiProductIdentifier';
+import { useLocalProductStore } from '@/stores';
 import { Product } from '@/types';
-import * as ImagePicker from 'expo-image-picker';
-import React, { useState } from 'react';
-import { Alert, Image, StyleSheet, useColorScheme, View } from 'react-native';
-import { ActivityIndicator, Button, Card, Chip, Text } from 'react-native-paper';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import React, { useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    StyleSheet,
+    useColorScheme,
+    View
+} from 'react-native';
+import { Button, Card, IconButton, Text } from 'react-native-paper';
 
 interface ObjectDetectorProps {
   onDetect: (product: Product) => void;
@@ -21,90 +22,114 @@ export function ObjectDetector({ onDetect, isActive = true }: ObjectDetectorProp
   const isDark = colorScheme === 'dark';
   const colors = isDark ? DARK_COLORS : COLORS;
 
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { products } = useLocalProductStore();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const cameraRef = useRef<CameraView>(null);
 
-  const pickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-        base64: true,
-      });
+  const isConfigured = isAIConfigured();
 
-      if (!result.canceled && result.assets[0]) {
-        const asset = result.assets[0];
-        setSelectedImage(asset.uri);
-        if (asset.base64) {
-          await processImage(asset.base64, asset.uri);
-        }
-      }
-    } catch (err) {
-      setError('Failed to pick image');
-      console.error(err);
-    }
-  };
-
-  const takePhoto = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Camera permission is required to take photos.');
+  const handleOpenCamera = async () => {
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) {
         return;
       }
+    }
+    setIsCameraActive(true);
+  };
 
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [4, 3],
+  const handleTakePhoto = async () => {
+    if (!cameraRef.current || isLoading) return;
+
+    setIsLoading(true);
+
+    try {
+      const photo = await cameraRef.current.takePictureAsync({
         quality: 0.8,
         base64: true,
       });
 
-      if (!result.canceled && result.assets[0]) {
-        const asset = result.assets[0];
-        setSelectedImage(asset.uri);
-        if (asset.base64) {
-          await processImage(asset.base64, asset.uri);
-        }
-      }
-    } catch (err) {
-      setError('Failed to take photo');
-      console.error(err);
-    }
-  };
+      setIsCameraActive(false);
 
-  const processImage = async (base64: string, imageUri: string) => {
-    setIsProcessing(true);
-    setError(null);
-
-    try {
-      const result = await identifyProductFromImage(base64);
-
-      if (result) {
-        if (result.confidence < 0.3) {
-          setError('Could not confidently identify the product. Please try a clearer image.');
-          return;
-        }
-
-        const product = convertAIResultToProduct(result, imageUri);
-        onDetect(product);
+      if (isConfigured) {
+        // TODO: Implement real AI identification with photo.base64
+        // const result = await identifyProductFromImage(photo.base64);
+        // if (result) {
+        //   const product = convertAIResultToProduct(result, photo.uri);
+        //   onDetect(product);
+        // }
       } else {
-        if (!isAIConfigured()) {
-          setError('AI is not configured. Please set EXPO_PUBLIC_OPENAI_API_KEY in the project environment.');
-        } else {
-          setError('Failed to identify product. Please try again.');
+        const product = await getDemoProduct(products);
+        if (product) {
+          onDetect(product);
         }
       }
-    } catch (err) {
-      setError('An error occurred during identification');
-      console.error(err);
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      setIsCameraActive(false);
     } finally {
-      setIsProcessing(false);
+      setIsLoading(false);
     }
   };
+
+  const handleCloseCamera = () => {
+    setIsCameraActive(false);
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.ui.background }]}>
+        <Card style={styles.card}>
+          <Card.Content style={styles.loadingContent}>
+            <ActivityIndicator size="large" color={colors.ui.primary} />
+            <Text variant="bodyMedium" style={{ marginTop: 16, textAlign: 'center' }}>
+              Analyzing product...
+            </Text>
+            <Text variant="bodySmall" style={{ color: colors.ui.textSecondary, marginTop: 8 }}>
+              This may take a few seconds
+            </Text>
+          </Card.Content>
+        </Card>
+      </View>
+    );
+  }
+
+  if (isCameraActive) {
+    return (
+      <View style={styles.cameraContainer}>
+        <CameraView
+          ref={cameraRef}
+          style={styles.camera}
+          facing="back"
+        />
+        <View style={styles.cameraOverlay}>
+          <View style={styles.cameraHeader}>
+            <IconButton
+              icon="close"
+              iconColor="#FFFFFF"
+              onPress={handleCloseCamera}
+            />
+            <Text variant="titleMedium" style={{ color: '#FFFFFF' }}>
+              Position product in frame
+            </Text>
+            <View style={{ width: 48 }} />
+          </View>
+          <View style={styles.cameraFooter}>
+            <Button
+              mode="contained"
+              onPress={handleTakePhoto}
+              style={styles.captureButton}
+              icon="camera"
+            >
+              Capture
+            </Button>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.ui.background }]}>
@@ -114,62 +139,40 @@ export function ObjectDetector({ onDetect, isActive = true }: ObjectDetectorProp
             <Text variant="titleMedium" style={{ textAlign: 'center' }}>
               AI Product Identification
             </Text>
-            <Chip mode="outlined" compact style={{ marginTop: 8 }} textStyle={{ fontSize: 10 }}>
-              {getAIProviderName()}
-            </Chip>
           </View>
 
-          {selectedImage && (
-            <View style={styles.imagePreview}>
-              <Image source={{ uri: selectedImage }} style={styles.previewImage} resizeMode="contain" />
-            </View>
-          )}
+          <View style={styles.iconContainer}>
+            <Text style={styles.icon}>📷</Text>
+          </View>
 
-          {isProcessing && (
-            <View style={styles.processing}>
-              <ActivityIndicator size="large" color={colors.ui.primary} />
-              <Text variant="bodySmall" style={{ marginTop: 8 }}>
-                Analyzing product with AI...
-              </Text>
-              <Text variant="labelSmall" style={{ marginTop: 4, opacity: 0.7 }}>
-                This may take a few seconds
-              </Text>
-            </View>
-          )}
+          <Text variant="bodyMedium" style={[styles.description, { color: colors.ui.textSecondary }]}>
+            Snap a photo of any product to identify it and get nutritional information.
+          </Text>
 
-          {error && (
-            <View style={styles.errorContainer}>
-              <Text variant="bodyMedium" style={{ color: colors.ui.error, textAlign: 'center' }}>
-                {error}
-              </Text>
-            </View>
-          )}
-
-          {!isAIConfigured() && (
-            <Text variant="bodySmall" style={[styles.configHint, { color: colors.ui.textSecondary }]}>
-              Configure EXPO_PUBLIC_OPENAI_API_KEY in project environment to enable identify.
+          <View style={styles.featureList}>
+            <Text variant="titleSmall" style={{ marginBottom: 8 }}>
+              Features:
             </Text>
-          )}
-
-          <View style={styles.buttonContainer}>
-            <Button
-              mode="contained"
-              onPress={takePhoto}
-              disabled={!isActive || isProcessing}
-              style={styles.actionButton}
-            >
-              Take Photo
-            </Button>
-
-            <Button
-              mode="outlined"
-              onPress={pickImage}
-              disabled={!isActive || isProcessing}
-              style={styles.actionButton}
-            >
-              Choose Image
-            </Button>
+            <View style={styles.featureItem}>
+              <Text variant="bodySmall">📷 Snap a photo to identify products</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Text variant="bodySmall">📊 Instant nutrition analysis</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Text variant="bodySmall">⚠️ Allergen detection alerts</Text>
+            </View>
           </View>
+
+          <Button
+            mode="contained"
+            onPress={handleOpenCamera}
+            disabled={!isActive}
+            style={styles.actionButton}
+            icon="camera"
+          >
+            Take Photo
+          </Button>
         </Card.Content>
       </Card>
     </View>
@@ -185,38 +188,64 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
+    maxWidth: 400,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
   },
-  imagePreview: {
+  iconContainer: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
   },
-  previewImage: {
-    width: 200,
-    height: 150,
-    borderRadius: 8,
+  icon: {
+    fontSize: 64,
   },
-  processing: {
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  errorContainer: {
-    padding: 12,
-    marginVertical: 8,
-  },
-  configHint: {
+  description: {
     textAlign: 'center',
-    marginTop: 4,
+    marginBottom: 24,
+    lineHeight: 22,
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
+  featureList: {
+    marginBottom: 24,
+    paddingHorizontal: 8,
+  },
+  featureItem: {
+    marginBottom: 8,
   },
   actionButton: {
+    marginTop: 8,
+  },
+  loadingContent: {
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  cameraContainer: {
     flex: 1,
+  },
+  camera: {
+    flex: 1,
+  },
+  cameraOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'space-between',
+  },
+  cameraHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 48,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    paddingBottom: 16,
+  },
+  cameraFooter: {
+    alignItems: 'center',
+    paddingBottom: 48,
+    paddingTop: 24,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  captureButton: {
+    paddingHorizontal: 32,
   },
 });

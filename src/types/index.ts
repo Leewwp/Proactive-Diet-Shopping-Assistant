@@ -1,6 +1,7 @@
 export * from './nutrition';
 export * from './product';
 export * from './profile';
+export * from './localProduct';
 
 export interface AlternativeProduct {
   barcode: string;

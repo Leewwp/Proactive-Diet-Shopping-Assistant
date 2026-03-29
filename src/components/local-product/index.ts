@@ -1,0 +1,1 @@
+export { LocalProductEditor } from './LocalProductEditor';

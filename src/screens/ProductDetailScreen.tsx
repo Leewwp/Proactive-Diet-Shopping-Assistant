@@ -19,10 +19,10 @@ export function ProductDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { barcode, addToCart } = useLocalSearchParams<{ barcode: string; addToCart?: string }>();
+  const { barcode } = useLocalSearchParams<{ barcode: string }>();
 
   const { profile, abTestMode } = useProfileStore();
-  const { getCachedProduct, cacheProduct, addRecentScan } = useProductStore();
+  const { getCachedProduct, cacheProduct, addRecentScan, addToComparison } = useProductStore();
   const { addItem } = useCartStore();
 
   const [product, setProduct] = useState<Product | undefined>(undefined);
@@ -74,15 +74,10 @@ export function ProductDetailScreen() {
     loadProduct();
   }, [loadProduct]);
 
-  useEffect(() => {
-    if (product && profile && addToCart === 'true') {
-      handleAddToCart();
-    }
-  }, [addToCart, handleAddToCart, product, profile]);
-
   const handleCompare = () => {
     if (product) {
-      router.push(`/compare?barcode=${product.barcode}`);
+      addToComparison(product);
+      router.push(`/scan?compare=true&slot=B` as any);
     }
   };
 
@@ -141,7 +136,7 @@ export function ProductDetailScreen() {
         </View>
       )}
 
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 110 }}>
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 100 }}>
         {product.imageUrl && <Image source={{ uri: product.imageUrl }} style={styles.productImage} />}
 
         <View style={styles.content}>
@@ -248,6 +243,18 @@ export function ProductDetailScreen() {
               </View>
             </View>
           )}
+
+          <View style={styles.actionSection}>
+            <Button
+              mode="outlined"
+              onPress={handleFindAlternatives}
+              icon="swap-horizontal"
+              style={styles.alternativesButton}
+              contentStyle={styles.alternativesButtonContent}
+            >
+              Find Healthier Alternatives
+            </Button>
+          </View>
         </View>
       </ScrollView>
 
@@ -261,14 +268,11 @@ export function ProductDetailScreen() {
           },
         ]}
       >
-        <Button mode="outlined" onPress={handleCompare} icon="compare">
+        <Button mode="outlined" onPress={handleCompare} icon="compare" style={styles.footerButton}>
           Compare
         </Button>
-        <Button mode="outlined" onPress={handleFindAlternatives} icon="swap-horizontal">
-          Alternatives
-        </Button>
-        <Button mode="contained" onPress={handleAddToCart} icon="plus">
-          Add
+        <Button mode="contained" onPress={handleAddToCart} icon="plus" style={styles.footerButton}>
+          Add to Cart
         </Button>
       </View>
     </View>
@@ -346,6 +350,16 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  actionSection: {
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  alternativesButton: {
+    borderRadius: 12,
+  },
+  alternativesButtonContent: {
+    paddingVertical: 8,
+  },
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -356,6 +370,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 14,
     borderTopWidth: 1,
+    gap: 12,
+  },
+  footerButton: {
+    flex: 1,
   },
   emergencyOverlay: {
     ...StyleSheet.absoluteFillObject,

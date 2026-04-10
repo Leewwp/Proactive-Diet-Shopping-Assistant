@@ -5,6 +5,7 @@ A smart shopping assistant built with Expo + React Native. It identifies food pr
 ## Core Features
 
 - Barcode scanning (EAN/UPC) — requires merchant partnership for full coverage
+- Camera-based food recognition (Baidu Cloud Product Search API)
 - Product nutrition information parsing (per 100g)
 - Allergen conflict detection (including family member dimension)
 - Shopping cart nutrition summary and compliance scoring
@@ -25,11 +26,25 @@ The app queries [Open Food Facts](https://world.openfoodfacts.org/) for product 
 
 > **Note**: Barcode-based product identification relies on data availability in Open Food Facts. Full coverage requires collaboration with merchants and brands to populate the database.
 
-### Camera-Based Recognition (VLM Match)
+### Camera-Based Recognition (Baidu Cloud Product Search API)
 
-For products without a scannable barcode, the app supports camera-based recognition via **VLM Match (Vision-Language Model Matching)**. This approach uses a vision-language model to analyze product images and match them against known product information, enabling identification of products that are not yet in any database.
+For products without a scannable barcode, the app supports camera-based recognition via **Baidu Cloud Product Search API**. This approach matches user-taken product photos against a custom product image library to identify food items and display their local nutrition information.
 
-> **Current Status**: Camera-based VLM Match is under development and not yet fully functional.
+#### How It Works
+
+1. **Custom Image Library Setup**: A dedicated product image library is created in Baidu Cloud console, with food product images uploaded (3-5 multi-angle photos per product recommended) and each image linked to a local nutrition database via product ID.
+
+2. **Photo Recognition Flow**:
+   - Authenticate by obtaining an `access_token` via API credentials
+   - Upload the user's photo in base64 encoding
+   - The API searches the custom image library and returns matching results (including product ID and similarity score 0-1)
+
+3. **Result Handling by Similarity Threshold**:
+   - Similarity > 0.8: Auto-match, display nutrition facts directly
+   - Similarity 0.6–0.8: Show confirmation dialog, user confirms before displaying nutrition facts
+   - Similarity < 0.6: Recognition failed, guide user to manually select product
+
+> **Note**: Camera-based recognition relies on a pre-configured custom image library in Baidu Cloud. Full coverage requires uploading local food product images and binding them to the nutrition database.
 
 ## Tech Stack
 
@@ -88,7 +103,7 @@ npm run lint
 ## Known Limitations
 
 - Open Food Facts data completeness varies by region and brand coverage
-- Camera-based VLM Match recognition is not yet fully implemented
+- Camera-based Baidu Cloud product search requires pre-configured custom image library
 - Offline mode does not support remote product identification (local cache only)
 
 ## License
